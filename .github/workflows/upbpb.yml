@@ -22,7 +22,7 @@ jobs:
           # 👉 默认更新 Latest 版本
           api_url="https://api.github.com/repos/bia-pain-bache/BPB-Worker-Panel/releases/latest"
 
-          # ❌ 如果要改为更新 Pre-release，注释上一行并取消注释下一行：
+          # ❌ 如需改为更新 Pre-release，请注释上一行并取消注释下一行：
           # api_url="https://api.github.com/repos/bia-pain-bache/BPB-Worker-Panel/releases"
 
           response=$(curl -s "$api_url")
@@ -38,9 +38,12 @@ jobs:
           echo "asset_url=$asset_url" >> $GITHUB_OUTPUT
           echo "version=$version" >> $GITHUB_OUTPUT
 
-      - name: Download and save as _worker.js
+      - name: Download and add version header
         run: |
-          curl -L "${{ steps.get_release.outputs.asset_url }}" -o _worker.js
+          curl -sL "${{ steps.get_release.outputs.asset_url }}" -o temp_worker.js
+          echo "// Version: ${{ steps.get_release.outputs.version }}" > _worker.js
+          cat temp_worker.js >> _worker.js
+          rm temp_worker.js
 
       - name: Check for changes or new file
         id: check_changes
