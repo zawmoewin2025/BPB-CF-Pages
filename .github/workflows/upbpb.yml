@@ -6,7 +6,7 @@ on:
   workflow_dispatch: # 支持手动触发
 
 permissions:
-  contents: write  # ✅ 允许对代码仓库进行写入
+  contents: write  # ✅ 允许工作流提交更改
 
 jobs:
   update-worker-js:
@@ -19,10 +19,10 @@ jobs:
       - name: Get release info (choose Latest or Pre-release)
         id: get_release
         run: |
-          # 👉 默认使用 Latest
+          # 👉 默认更新 Latest 版本
           api_url="https://api.github.com/repos/bia-pain-bache/BPB-Worker-Panel/releases/latest"
 
-          # ❌ 如需使用 Pre-release 请切换：
+          # ❌ 如果要改为更新 Pre-release，注释上一行并取消注释下一行：
           # api_url="https://api.github.com/repos/bia-pain-bache/BPB-Worker-Panel/releases"
 
           response=$(curl -s "$api_url")
@@ -42,12 +42,23 @@ jobs:
         run: |
           curl -L "${{ steps.get_release.outputs.asset_url }}" -o _worker.js
 
-      - name: Check for changes
+      - name: Check for changes or new file
         id: check_changes
         run: |
-          if [ -f _worker.js ] && git diff --exit-code _worker.js > /dev/null; then
+          if [ ! -f _worker.js ]; then
             echo "changed=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          if git ls-files --error-unmatch _worker.js > /dev/null 2>&1; then
+            # 文件已被 Git 跟踪，检查是否有变更
+            if git diff --quiet _worker.js; then
+              echo "changed=false" >> $GITHUB_OUTPUT
+            else
+              echo "changed=true" >> $GITHUB_OUTPUT
+            fi
           else
+            # 文件是新增的
             echo "changed=true" >> $GITHUB_OUTPUT
           fi
 
