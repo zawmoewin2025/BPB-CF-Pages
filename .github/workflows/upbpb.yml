@@ -2,8 +2,11 @@ name: Update BPB-Worker-Panel
 
 on:
   schedule:
-    - cron: '0 3 * * *'  # 每天 UTC 03:00 执行一次
-  workflow_dispatch:     # 支持手动触发
+    - cron: '0 3 * * *' # 每天 UTC 时间 03:00
+  workflow_dispatch: # 支持手动触发
+
+permissions:
+  contents: write  # ✅ 允许对代码仓库进行写入
 
 jobs:
   update-worker-js:
@@ -16,10 +19,10 @@ jobs:
       - name: Get release info (choose Latest or Pre-release)
         id: get_release
         run: |
-          # 👉 默认使用最新正式版（Latest）
+          # 👉 默认使用 Latest
           api_url="https://api.github.com/repos/bia-pain-bache/BPB-Worker-Panel/releases/latest"
 
-          # ❌ 若要改为更新 Pre-release，请注释上一行并取消注释下一行：
+          # ❌ 如需使用 Pre-release 请切换：
           # api_url="https://api.github.com/repos/bia-pain-bache/BPB-Worker-Panel/releases"
 
           response=$(curl -s "$api_url")
@@ -35,24 +38,24 @@ jobs:
           echo "asset_url=$asset_url" >> $GITHUB_OUTPUT
           echo "version=$version" >> $GITHUB_OUTPUT
 
-      - name: Download worker.js as _worker.js to root
+      - name: Download and save as _worker.js
         run: |
           curl -L "${{ steps.get_release.outputs.asset_url }}" -o _worker.js
 
       - name: Check for changes
-        id: git_diff
+        id: check_changes
         run: |
-          if git diff --quiet --exit-code _worker.js; then
+          if [ -f _worker.js ] && git diff --exit-code _worker.js > /dev/null; then
             echo "changed=false" >> $GITHUB_OUTPUT
           else
             echo "changed=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Commit and push changes
-        if: steps.git_diff.outputs.changed == 'true'
+      - name: Commit and push if changed
+        if: steps.check_changes.outputs.changed == 'true'
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add _worker.js
           git commit -m "chore: update _worker.js to ${{ steps.get_release.outputs.version }}"
           git push
