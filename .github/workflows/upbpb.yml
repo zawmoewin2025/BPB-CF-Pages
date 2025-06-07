@@ -16,24 +16,27 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Get release info (Latest or Pre-release)
+      - name: Get release info (Latest including Pre-release)
         id: get_release
         run: |
-          # 默认更新 Latest 版本
-          api_url="https://api.github.com/repos/bia-pain-bache/BPB-Worker-Panel/releases/latest"
-
-          # 如需更新 Pre-release，注释上面一行，取消注释下一行：
-          # api_url="https://api.github.com/repos/bia-pain-bache/BPB-Worker-Panel/releases"
-
+          api_url="https://api.github.com/repos/bia-pain-bache/BPB-Worker-Panel/releases"
           response=$(curl -s "$api_url")
 
-          if echo "$api_url" | grep -q "/latest"; then
-            version=$(echo "$response" | jq -r '.tag_name // empty')
-            asset_url=$(echo "$response" | jq -r '.assets[]? | select(.name == "worker.js") | .browser_download_url // empty')
-          else
-            version=$(echo "$response" | jq -r '[.[] | select(.prerelease == true)] | first | .tag_name // empty')
-            asset_url=$(echo "$response" | jq -r '[.[] | select(.prerelease == true)] | first | .assets[]? | select(.name == "worker.js") | .browser_download_url // empty')
-          fi
+          asset_url=""
+          version=""
+
+          releases=$(echo "$response" | jq -c '.[]')
+
+          for release in $releases; do
+            version_candidate=$(echo "$release" | jq -r '.tag_name // empty')
+            asset_candidate=$(echo "$release" | jq -r '.assets[]? | select(.name == "worker.js") | .browser_download_url // empty')
+
+            if [ -n "$asset_candidate" ]; then
+              asset_url="$asset_candidate"
+              version="$version_candidate"
+              break
+            fi
+          done
 
           if [ -z "$version" ] || [ -z "$asset_url" ]; then
             echo "Error: Could not find version or asset URL for worker.js"
