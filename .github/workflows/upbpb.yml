@@ -23,19 +23,19 @@ jobs:
           api_url="https://api.github.com/repos/bia-pain-bache/BPB-Worker-Panel/releases"
           echo "Fetching releases from: $api_url"
 
-          # 使用 -w 获取 HTTP 状态码，响应保存到 response.json
-          http_code=$(curl -s -w "%{http_code}" -o response.json "$api_url")
+          response_file="response.json"
+          http_code=$(curl -s -o "$response_file" -w "%{http_code}" "$api_url")
 
           if [ "$http_code" -ne 200 ]; then
             echo "Error: GitHub API returned HTTP $http_code"
-            cat response.json
+            cat "$response_file"
             exit 1
           fi
 
           asset_url=""
           version=""
 
-          releases=$(jq -c '.[]' response.json)
+          releases=$(jq -c '.[]' "$response_file")
 
           for release in $releases; do
             version_candidate=$(echo "$release" | jq -r '.tag_name // empty')
