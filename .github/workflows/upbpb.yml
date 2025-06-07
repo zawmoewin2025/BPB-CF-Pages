@@ -16,37 +16,34 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Get release info (support nested assets)
+      - name: Get latest release info with worker.js
         id: get_release
         run: |
           set -e
-          
+
+          echo "Fetching latest release with worker.js..."
           api_url="https://api.github.com/repos/bia-pain-bache/BPB-Worker-Panel/releases"
-          echo "Fetching releases from: $api_url"
-          
-          releases=$(curl -s "$api_url")
-          asset_url=""
-          version=""
 
-          # 外层按 release 拆分
-          echo "$releases" | awk 'BEGIN{RS="},\\{"; ORS="}\n"} {print $0}' | while read -r release; do
-            version=$(echo "$release" | grep '"tag_name":' | sed -E 's/.*"tag_name": ?"([^"]+)".*/\1/')
+          asset_info=$(curl -s "$api_url" | jq -r '
+            .[] 
+            | select(.assets[]?.name == "worker.js") 
+            | {version: .tag_name, url: (.assets[] | select(.name == "worker.js") | .browser_download_url)} 
+            | @base64' | head -n 1)
 
-            # 内层查找包含 worker.js 的 asset
-            echo "$release" | awk 'BEGIN{RS="\\{"; ORS="{"} {print $0}' | while read -r block; do
-              echo "$block" | grep -q '"name": ?"worker\.js"' || continue
-              asset_url=$(echo "$block" | grep 'browser_download_url' | sed -E 's/.*"browser_download_url": ?"([^"]+)".*/\1/')
-              if [ -n "$asset_url" ]; then
-                echo "Found asset in version: $version"
-                echo "asset_url=$asset_url" >> $GITHUB_OUTPUT
-                echo "version=$version" >> $GITHUB_OUTPUT
-                exit 0
-              fi
-            done
-          done
+          if [ -z "$asset_info" ]; then
+            echo "Error: worker.js not found in any release"
+            exit 1
+          fi
 
-          echo "Error: worker.js not found in any release"
-          exit 1
+          decode() {
+            echo "$asset_info" | base64 --decode | jq -r "$1"
+          }
+
+          asset_url=$(decode '.url')
+          version=$(decode '.version')
+
+          echo "asset_url=$asset_url" >> $GITHUB_OUTPUT
+          echo "version=$version" >> $GITHUB_OUTPUT
 
       - name: Download worker.js and add version header
         run: |
