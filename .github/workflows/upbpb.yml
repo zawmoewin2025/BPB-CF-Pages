@@ -16,10 +16,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Get release info (Latest including Pre-release)
+      - name: Get release info (without jq)
         id: get_release
         run: |
           set -e
+
           api_url="https://api.github.com/repos/bia-pain-bache/BPB-Worker-Panel/releases"
           echo "Fetching releases from: $api_url"
 
@@ -32,24 +33,11 @@ jobs:
             exit 1
           fi
 
-          asset_url=""
-          version=""
+          asset_url=$(grep -A10 '"name": "worker.js"' "$response_file" | grep 'browser_download_url' | head -n1 | sed -E 's/.*"browser_download_url": "(.*)".*/\1/')
+          version=$(grep '"tag_name":' "$response_file" | head -n1 | sed -E 's/.*"tag_name": "(.*)".*/\1/')
 
-          releases=$(jq -c '.[]' "$response_file")
-
-          for release in $releases; do
-            version_candidate=$(echo "$release" | jq -r '.tag_name // empty')
-            asset_candidate=$(echo "$release" | jq -r '.assets[]? | select(.name == "worker.js") | .browser_download_url // empty')
-
-            if [ -n "$asset_candidate" ]; then
-              asset_url="$asset_candidate"
-              version="$version_candidate"
-              break
-            fi
-          done
-
-          if [ -z "$version" ] || [ -z "$asset_url" ]; then
-            echo "Error: Could not find version or asset URL for worker.js"
+          if [ -z "$asset_url" ] || [ -z "$version" ]; then
+            echo "Error: Failed to parse asset_url or version"
             exit 1
           fi
 
