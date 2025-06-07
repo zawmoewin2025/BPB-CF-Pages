@@ -33,11 +33,25 @@ jobs:
             exit 1
           fi
 
-          asset_url=$(grep -A10 '"name": "worker.js"' "$response_file" | grep 'browser_download_url' | head -n1 | sed -E 's/.*"browser_download_url": "(.*)".*/\1/')
-          version=$(grep '"tag_name":' "$response_file" | head -n1 | sed -E 's/.*"tag_name": "(.*)".*/\1/')
+          asset_url=""
+          version=""
+
+          # 用 awk 拆分成每个 release 块
+          awk 'BEGIN{RS="{"; ORS="{"} NR>1 {print $0}' "$response_file" | while read -r block; do
+            echo "$block" | grep -q '"name": "worker.js"' || continue
+
+            asset_url=$(echo "$block" | grep 'browser_download_url' | head -n1 | sed -E 's/.*"browser_download_url": ?"([^"]+)".*/\1/')
+            version=$(echo "$block" | grep '"tag_name":' | head -n1 | sed -E 's/.*"tag_name": ?"([^"]+)".*/\1/')
+
+            if [ -n "$asset_url" ] && [ -n "$version" ]; then
+              break
+            fi
+          done
 
           if [ -z "$asset_url" ] || [ -z "$version" ]; then
             echo "Error: Failed to parse asset_url or version"
+            echo "Debug: asset_url=$asset_url"
+            echo "Debug: version=$version"
             exit 1
           fi
 
