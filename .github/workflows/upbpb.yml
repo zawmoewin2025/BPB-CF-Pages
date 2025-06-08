@@ -25,14 +25,14 @@ jobs:
           api_url="https://api.github.com/repos/bia-pain-bache/BPB-Worker-Panel/releases"
 
           asset_info=$(curl -s "$api_url" | jq -r '
-            .[] 
-            | select(.assets[]?.name == "worker.js") 
-            | {
-                version: .tag_name, 
-                url: (.assets[] | select(.name == "worker.js") | .browser_download_url), 
-                published: .published_at
-              } 
-            | @base64' | head -n 1)
+            [.[] 
+              | select(.assets[]?.name == "worker.js") 
+              | {
+                  version: .tag_name, 
+                  url: (.assets[] | select(.name == "worker.js") | .browser_download_url), 
+                  published: .published_at
+                }
+            ][0] | @base64')
 
           if [ -z "$asset_info" ]; then
             echo "Error: worker.js not found in any release"
