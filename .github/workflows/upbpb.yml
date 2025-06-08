@@ -19,72 +19,67 @@ jobs:
       - name: Get latest release info with worker.js
         id: get_release
         run: |
-          set -e # 一旦某个命令失败，则脚本立即终止
+          set -e
 
           echo "Fetching latest release with worker.js..."
           api_url="https://api.github.com/repos/bia-pain-bache/BPB-Worker-Panel/releases"
 
-          # 使用 curl 拉取所有 release 的 JSON 数据，并用 jq 提取含有 worker.js 的最新发布信息（只取第一个）
           asset_info=$(curl -s "$api_url" | jq -r '
             .[] 
-            | select(.assets[]?.name == "worker.js") # 筛选 assets 中包含 worker.js 的 release
-            | {version: .tag_name, url: (.assets[] | select(.name == "worker.js") | .browser_download_url)} 
+            | select(.assets[]?.name == "worker.js") 
+            | {version: .tag_name, url: (.assets[] | select(.name == "worker.js") | .browser_download_url), published: .published_at} 
             | @base64' | head -n 1)
 
-          # 如果找不到则报错退出
           if [ -z "$asset_info" ]; then
             echo "Error: worker.js not found in any release"
             exit 1
           fi
 
-          # 定义 decode 函数从 base64 中解出字段
           decode() {
             echo "$asset_info" | base64 --decode | jq -r "$1"
           }
 
-          # 解出资源下载链接和版本号
           asset_url=$(decode '.url')
           version=$(decode '.version')
+          published_at=$(decode '.published')
 
-          # 输出供后续步骤使用
           echo "asset_url=$asset_url" >> $GITHUB_OUTPUT
           echo "version=$version" >> $GITHUB_OUTPUT
+          echo "published_at=$published_at" >> $GITHUB_OUTPUT
 
       - name: Download worker.js and add version header
         run: |
-          # 下载 worker.js 到临时文件
           curl -sL "${{ steps.get_release.outputs.asset_url }}" -o temp_worker.js
-
-          # 在文件头部添加版本号注释，并保存为 _worker.js
-          echo "// Version: ${{ steps.get_release.outputs.version }}" > _worker.js
-          cat temp_worker.js >> _worker.js
-          rm temp_worker.js # 删除临时文件
+          {
+            echo "// Version: ${{ steps.get_release.outputs.version }}"
+            echo "// Published at: ${{ steps.get_release.outputs.published_at }}"
+            cat temp_worker.js
+          } > _worker.js
+          rm temp_worker.js
 
       - name: Check for changes or new file
         id: check_changes
         run: |
-          # 如果文件不存在则标记为未改变
           if [ ! -f _worker.js ]; then
             echo "changed=false" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          # 如果 _worker.js 已存在于 Git 中，检查是否有改动
           if git ls-files --error-unmatch _worker.js > /dev/null 2>&1; then
             if git diff --quiet _worker.js; then
-              echo "changed=false" >> $GITHUB_OUTPUT # 无变动
+              echo "changed=false" >> $GITHUB_OUTPUT
             else
-              echo "changed=true" >> $GITHUB_OUTPUT # 有改动
+              echo "changed=true" >> $GITHUB_OUTPUT
             fi
           else
-            echo "changed=true" >> $GITHUB_OUTPUT # 新文件
+            echo "changed=true" >> $GITHUB_OUTPUT
           fi
 
       - name: Commit and push if changed
-        if: steps.check_changes.outputs.changed == 'true' # 仅当文件发生变动时才执行
+        if: steps.check_changes.outputs.changed == 'true'
         run: |
-          git config --global user.name "github-actions[bot]" # 设置提交用户名
-          git config --global user.email "github-actions[bot]@users.noreply.github.com" # 设置提交邮箱
-          git add _worker.js # 添加文件
-          git commit -m "Update _worker.js to ${{ steps.get_release.outputs.version }}" # 提交变更
-          git push # 推送到远程仓库
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add _worker.js
+          git commit -m "Update _worker.js to ${{ steps.get_release.outputs.version }} (published at ${{ steps.get_release.outputs.published_at }})"
+          git push
