@@ -27,7 +27,11 @@ jobs:
           asset_info=$(curl -s "$api_url" | jq -r '
             .[] 
             | select(.assets[]?.name == "worker.js") 
-            | {version: .tag_name, url: (.assets[] | select(.name == "worker.js") | .browser_download_url), published: .published_at} 
+            | {
+                version: .tag_name, 
+                url: (.assets[] | select(.name == "worker.js") | .browser_download_url), 
+                published: .published_at
+              } 
             | @base64' | head -n 1)
 
           if [ -z "$asset_info" ]; then
@@ -51,8 +55,8 @@ jobs:
         run: |
           curl -sL "${{ steps.get_release.outputs.asset_url }}" -o temp_worker.js
           {
-            echo "// Version: ${{ steps.get_release.outputs.version }}"
-            echo "// Published at: ${{ steps.get_release.outputs.published_at }}"
+            echo "// 版本: ${{ steps.get_release.outputs.version }}"
+            echo "// 发布时间: ${{ steps.get_release.outputs.published_at }}"
             cat temp_worker.js
           } > _worker.js
           rm temp_worker.js
@@ -81,5 +85,5 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add _worker.js
-          git commit -m "Update _worker.js to ${{ steps.get_release.outputs.version }} (published at ${{ steps.get_release.outputs.published_at }})"
+          git commit -m "Update _worker.js to ${{ steps.get_release.outputs.version }}（发布时间：${{ steps.get_release.outputs.published_at }}）"
           git push
