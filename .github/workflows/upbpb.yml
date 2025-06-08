@@ -53,7 +53,7 @@ jobs:
 
       - name: Download worker.js and add version header
         run: |
-          curl -sL "${{ steps.get_release.outputs.asset_url }}" -o temp_worker.js
+          curl -s --retry 3 --retry-delay 2 -L "${{ steps.get_release.outputs.asset_url }}" -o temp_worker.js
           {
             echo "// 版本: ${{ steps.get_release.outputs.version }}"
             echo "// 发布时间: ${{ steps.get_release.outputs.published_at }}"
@@ -70,7 +70,7 @@ jobs:
           fi
 
           if git ls-files --error-unmatch _worker.js > /dev/null 2>&1; then
-            if git diff --quiet _worker.js; then
+            if git diff --quiet HEAD -- _worker.js; then
               echo "changed=false" >> $GITHUB_OUTPUT
             else
               echo "changed=true" >> $GITHUB_OUTPUT
@@ -85,5 +85,5 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add _worker.js
-          git commit -m "Update _worker.js to ${{ steps.get_release.outputs.version }}（发布时间：${{ steps.get_release.outputs.published_at }}）"
+          git commit -m "同步更新_worker.js ${{ steps.get_release.outputs.version }}（发布时间：${{ steps.get_release.outputs.published_at }}）"
           git push
